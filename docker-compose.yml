@@ -1,0 +1,21 @@
+version: '3.9'
+name: take5_algo1
+
+services:
+  python_analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: take5_algo1_python
+    ports:
+      - "8100:8080"
+    networks:
+      - kafka_broker_kafka-net
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=broker_1:9092
+      - KAFKA_CONSUMER_GROUP=take5_algo1_group
+    restart: unless-stopped
+
+networks:
+  kafka_broker_kafka-net:
+    external: true
