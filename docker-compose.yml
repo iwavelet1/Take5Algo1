@@ -12,8 +12,9 @@ services:
     networks:
       - kafka_broker_kafka-net
     environment:
-      - KAFKA_BOOTSTRAP_SERVERS=broker_1:9092
-      - KAFKA_CONSUMER_GROUP=take5_algo1_group
+      - RUN_MODE=docker
+      - KAFKA_GROUP_ID=take5_algo1_group
+      - LOG_LEVEL=INFO
     restart: unless-stopped
 
 networks:
