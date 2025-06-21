@@ -33,7 +33,7 @@ class KafkaConfig:
         self.consumer_config = {
             'bootstrap.servers': self.bootstrap_servers,
             'group.id': self.group_id,
-            'auto.offset.reset': os.getenv('KAFKA_AUTO_OFFSET_RESET', 'earliest'),
+            'auto.offset.reset': 'earliest',
             'enable.auto.commit': True,
             'auto.commit.interval.ms': int(os.getenv('KAFKA_AUTO_COMMIT_INTERVAL', '1000')),
             'session.timeout.ms': int(os.getenv('KAFKA_SESSION_TIMEOUT', '45000')),

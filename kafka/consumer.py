@@ -4,6 +4,7 @@ import threading
 from typing import Dict, Callable, Any
 from confluent_kafka import Consumer, KafkaError, KafkaException
 from .config import KafkaConfig
+from asset_data.global_buffer_manager import global_buffer_manager
 
 class Take5KafkaConsumer:
     """
@@ -37,60 +38,60 @@ class Take5KafkaConsumer:
     
     def _handle_bar_trends(self, message: Any):
         """Handle bar_trends topic messages (BarTrends)"""
-        print(f"📊 [BAR_TRENDS] Received message:")
-        print(f"   Key: {message.key()}")
-        print(f"   Value: {message.value()}")
-        print(f"   Timestamp: {message.timestamp()}")
-        print(f"   Partition: {message.partition()}")
-        print(f"   Offset: {message.offset()}")
-        print("-" * 80)
-        
         try:
-            # Parse JSON if possible
+            # Parse JSON and feed to buffer manager
             if message.value():
                 data = json.loads(message.value().decode('utf-8'))
-                print(f"   Parsed JSON: {json.dumps(data, indent=2)}")
+                symbol = data.get('symbol', 'UNKNOWN')
+                bar_time_frame = data.get('barData', {}).get('barTimeFrame', 'UNKNOWN')
+                
+                # Feed message to global buffer manager with topic info
+                if symbol != 'UNKNOWN' and bar_time_frame != 'UNKNOWN':
+                    global_buffer_manager.add_message('bar_trends', symbol, bar_time_frame, data)
+                
+                self.logger.debug(f"📊 [BAR_TRENDS] {symbol}-{bar_time_frame}")
         except json.JSONDecodeError:
-            print(f"   Raw value: {message.value()}")
-        print("=" * 80)
+            self.logger.warning(f"📊 [BAR_TRENDS] Invalid JSON in message")
+        except Exception as e:
+            self.logger.error(f"📊 [BAR_TRENDS] Error processing message: {e}")
     
     def _handle_historic_stats(self, message: Any):
         """Handle historic_stats topic messages (BarHistoricTrends)"""
-        print(f"📈 [HISTORIC_STATS] Received message:")
-        print(f"   Key: {message.key()}")
-        print(f"   Value: {message.value()}")
-        print(f"   Timestamp: {message.timestamp()}")
-        print(f"   Partition: {message.partition()}")
-        print(f"   Offset: {message.offset()}")
-        print("-" * 80)
-        
         try:
-            # Parse JSON if possible
+            # Parse JSON and feed to buffer manager
             if message.value():
                 data = json.loads(message.value().decode('utf-8'))
-                print(f"   Parsed JSON: {json.dumps(data, indent=2)}")
+                symbol = data.get('symbol', 'UNKNOWN')
+                bar_time_frame = data.get('barData', {}).get('barTimeFrame', 'UNKNOWN')
+                
+                # Feed message to global buffer manager with topic info
+                if symbol != 'UNKNOWN' and bar_time_frame != 'UNKNOWN':
+                    global_buffer_manager.add_message('historic_stats', symbol, bar_time_frame, data)
+                
+                self.logger.debug(f"📈 [HISTORIC_STATS] {symbol}-{bar_time_frame}")
         except json.JSONDecodeError:
-            print(f"   Raw value: {message.value()}")
-        print("=" * 80)
+            self.logger.warning(f"📈 [HISTORIC_STATS] Invalid JSON in message")
+        except Exception as e:
+            self.logger.error(f"📈 [HISTORIC_STATS] Error processing message: {e}")
     
     def _handle_asset_trends(self, message: Any):
         """Handle asset_trends topic messages (AssetTrendGraph)"""
-        print(f"🔮 [ASSET_TRENDS] Received message:")
-        print(f"   Key: {message.key()}")
-        print(f"   Value: {message.value()}")
-        print(f"   Timestamp: {message.timestamp()}")
-        print(f"   Partition: {message.partition()}")
-        print(f"   Offset: {message.offset()}")
-        print("-" * 80)
-        
         try:
-            # Parse JSON if possible
+            # Parse JSON and feed to buffer manager
             if message.value():
                 data = json.loads(message.value().decode('utf-8'))
-                print(f"   Parsed JSON: {json.dumps(data, indent=2)}")
+                symbol = data.get('symbol', 'UNKNOWN')
+                bar_time_frame = data.get('barData', {}).get('barTimeFrame', 'UNKNOWN')
+                
+                # Feed message to global buffer manager with topic info
+                if symbol != 'UNKNOWN' and bar_time_frame != 'UNKNOWN':
+                    global_buffer_manager.add_message('asset_trends', symbol, bar_time_frame, data)
+                
+                self.logger.debug(f"🔮 [ASSET_TRENDS] {symbol}-{bar_time_frame}")
         except json.JSONDecodeError:
-            print(f"   Raw value: {message.value()}")
-        print("=" * 80)
+            self.logger.warning(f"🔮 [ASSET_TRENDS] Invalid JSON in message")
+        except Exception as e:
+            self.logger.error(f"🔮 [ASSET_TRENDS] Error processing message: {e}")
     
     def start(self):
         """Start the Kafka consumer"""
