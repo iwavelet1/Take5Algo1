@@ -223,8 +223,7 @@ class BufferManagedKafkaConsumer:
             'kafka_messages_processed': self.processed_count,
             'kafka_errors': self.error_count,
             'buffer_stats': self.buffer_manager.get_all_buffer_stats(),
-            'all_topics': self.buffer_manager.get_all_topics(),
-            'total_combinations': len(self.buffer_manager.get_all_combinations_all_topics())
+            'all_topics': self.buffer_manager.get_all_topics()
         }
     
     def print_buffer_summary(self):
@@ -238,7 +237,6 @@ class BufferManagedKafkaConsumer:
         print(f"✅ Messages Processed: {stats['kafka_messages_processed']}")
         print(f"❌ Errors: {stats['kafka_errors']}")
         print(f"🗂️  Active Topics: {len(stats['all_topics'])}")
-        print(f"📈 Total Asset/TimeFrame Combinations: {stats['total_combinations']}")
         
         if stats['all_topics']:
             print(f"\nActive Topics: {', '.join(stats['all_topics'])}")

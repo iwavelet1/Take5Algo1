@@ -6,9 +6,10 @@ new assets are detected from the asset_trends topic.
 """
 
 import logging
-from typing import Dict, Set
+from typing import Dict, Set, List
 from asset_data import AssetBufferManager, AssetDataChanged
-from .asset_trend_processor import AssetTrendProcessor
+from .asset_trend_processor import AssetTrendProcessor, SignalAlgorithm
+from .cross_calculator import CrossCalculator
 
 
 class AssetTrendFactory:
@@ -19,10 +20,14 @@ class AssetTrendFactory:
     creates AssetTrendProcessor instances for them.
     """
     
-    def __init__(self, buffer_manager: AssetBufferManager):
-        self.buffer_manager = buffer_manager
+    def __init__(self, app):
+        self.app = app
+        self.buffer_manager = app.get_global_buffer_manager()
         self.processors: Dict[str, AssetTrendProcessor] = {}
         self.seen_assets: Set[str] = set()
+        
+        # Static map of asset to algorithms
+        self.asset_algorithms: Dict[str, List[SignalAlgorithm]] = self._create_asset_algorithm_map()
         
         self.logger = logging.getLogger(__name__)
         self.logger.info("🏭 AssetTrendFactory initialized")
@@ -30,11 +35,43 @@ class AssetTrendFactory:
         # Register to listen for ALL asset_trends events to detect new assets
         self._setup_asset_detection()
     
+    def _create_asset_algorithm_map(self) -> Dict[str, List[SignalAlgorithm]]:
+        """Create static map of assets to their algorithms"""
+        # Asset-specific algorithm map
+        asset_algorithm_map = {
+            # Wildcard "*" applies to all assets
+            "*": [CrossCalculator()],
+            
+            # Add specific assets and their algorithms here
+            "NVDA": [CrossCalculator()],
+            # Example: "SPY": [CrossCalculator(), SomeOtherAlgorithm()],
+            # Specific asset entries override the wildcard
+        }
+        
+        return asset_algorithm_map
+    
     def _setup_asset_detection(self):
         """Setup detection for new assets in asset_trends topic"""
-        # We need to register for all assets, but the current API only allows specific asset registration
-        # For now, we'll use the existing change listener system to detect new assets
+        # First, check for any existing assets in asset_trends topic
+        self._check_existing_assets()
+        
+        # Then, register for future buffer changes to detect new assets
         self.buffer_manager.subscribe(self._handle_buffer_change)
+    
+    def _check_existing_assets(self):
+        """Check for existing assets in asset_trends topic and create processors for them"""
+        try:
+            existing_assets = self.buffer_manager.get_all_assets("asset_trends")
+            self.logger.info(f"🔍 Checking existing assets in asset_trends: {existing_assets}")
+            
+            for asset in existing_assets:
+                if asset not in self.seen_assets:
+                    self.logger.info(f"🆕 Found existing asset in asset_trends: {asset}")
+                    self._create_processor_for_asset(asset)
+                    self.seen_assets.add(asset)
+                    
+        except Exception as e:
+            self.logger.error(f"Error checking existing assets: {e}")
     
     def _handle_buffer_change(self, topic: str, asset: str, bar_time_frame: int):
         """Handle buffer changes to detect new assets from asset_trends topic"""
@@ -49,8 +86,11 @@ class AssetTrendFactory:
             self.logger.warning(f"AssetTrendProcessor already exists for {asset}")
             return
         
-        # Create new processor
-        processor = AssetTrendProcessor(asset, self.buffer_manager)
+        # Get algorithms for this asset
+        algorithms = self.get_algorithms_for_asset(asset)
+        
+        # Create new processor with algorithm map
+        processor = AssetTrendProcessor(asset, self.buffer_manager, self.asset_algorithms)
         
         # Start the processor
         processor.start()
@@ -58,7 +98,30 @@ class AssetTrendFactory:
         # Store the processor
         self.processors[asset] = processor
         
-        self.logger.info(f"✅ Created and started AssetTrendProcessor for {asset}")
+        self.logger.info(f"✅ Created and started AssetTrendProcessor for {asset} with {len(algorithms)} algorithms")
+    
+    def get_algorithms_for_asset(self, asset: str) -> List[SignalAlgorithm]:
+        """Get algorithms for a specific asset"""
+        algorithms = []
+        
+        # Add wildcard "*" algorithms (apply to all assets)
+        wildcard_algorithms = self.asset_algorithms.get("*", [])
+        algorithms.extend(wildcard_algorithms)
+        
+        # Add asset-specific algorithms
+        asset_specific_algorithms = self.asset_algorithms.get(asset, [])
+        algorithms.extend(asset_specific_algorithms)
+        
+        # Remove duplicates while preserving order
+        seen = set()
+        distinct_algorithms = []
+        for algo in algorithms:
+            algo_type = type(algo)
+            if algo_type not in seen:
+                seen.add(algo_type)
+                distinct_algorithms.append(algo)
+        
+        return distinct_algorithms
     
     def get_processor(self, asset: str) -> AssetTrendProcessor:
         """Get the processor for a specific asset"""

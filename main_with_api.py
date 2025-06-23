@@ -10,7 +10,7 @@ import signal
 import sys
 import time
 import threading
-from kafka.consumer import KafkaConsumerThread
+from take5_algo1 import Take5Algo1
 from kafka.config import KafkaConfig
 from api_server import Take5ApiServer
 
@@ -52,10 +52,10 @@ def setup_logging():
         )
 
 class Take5MainWithApi:
-    """Main application class that runs both Kafka consumer and API server"""
+    """Main application class that runs both Take5Algo1 and API server"""
     
     def __init__(self):
-        self.kafka_thread = None
+        self.take5_app = None
         self.api_server = None
         self.api_thread = None
         self.logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ class Take5MainWithApi:
         sys.exit(0)
     
     def start(self):
-        """Start both Kafka consumer and API server"""
+        """Start both Take5Algo1 application and API server"""
         print("🚀 Starting Take5Algo1 with Analytics API...")
         print("="*80)
         
@@ -82,11 +82,11 @@ class Take5MainWithApi:
             print(f"🔧 Kafka Configuration: {config}")
             self.logger.info(f"🔧 Configuration: {config}")
             
-            # Start Kafka consumer thread
-            self.logger.info("🧵 Initializing Kafka consumer thread...")
-            self.kafka_thread = KafkaConsumerThread(config=config)
-            self.kafka_thread.start()
-            self.logger.info("✅ Kafka consumer thread started successfully")
+            # Start Take5Algo1 application
+            self.logger.info("🧵 Initializing Take5Algo1 application...")
+            self.take5_app = Take5Algo1(config=config)
+            self.take5_app.start()
+            self.logger.info("✅ Take5Algo1 application started successfully")
             
             # Wait a moment for Kafka consumer to initialize
             time.sleep(2)
@@ -100,7 +100,7 @@ class Take5MainWithApi:
             print("✅ All services started successfully!")
             print("")
             print("📊 Services Running:")
-            print("   • Kafka Consumer: Processing real-time data streams")
+            print("   • Take5Algo1: Processing real-time data streams")
             print("   • REST API Server: http://localhost:8000")
             print("")
             print("🔗 Available Endpoints:")
@@ -134,11 +134,10 @@ class Take5MainWithApi:
             self.logger.info("🧹 Stopping REST API server...")
             self.api_server.stop()
         
-        # Stop Kafka consumer
-        if self.kafka_thread:
-            self.logger.info("🧹 Stopping Kafka consumer thread...")
-            self.kafka_thread.stop()
-            self.kafka_thread.join(timeout=5)
+        # Stop Take5Algo1 application
+        if self.take5_app:
+            self.logger.info("🧹 Stopping Take5Algo1 application...")
+            self.take5_app.stop()
         
         self.logger.info("👋 Take5Algo1 shutdown complete")
         print("👋 Take5Algo1 with API shutdown complete")

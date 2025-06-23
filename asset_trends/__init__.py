@@ -6,8 +6,10 @@ This module provides processors for handling asset_trends topic data.
 
 from .asset_trend_processor import AssetTrendProcessor
 from .asset_trend_factory import AssetTrendFactory
+from .cross_calculator import CrossCalculator
 
 __all__ = [
     'AssetTrendProcessor',
-    'AssetTrendFactory'
+    'AssetTrendFactory',
+    'CrossCalculator'
 ] 

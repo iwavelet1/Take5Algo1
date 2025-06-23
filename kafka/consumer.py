@@ -4,7 +4,6 @@ import threading
 from typing import Dict, Callable, Any
 from confluent_kafka import Consumer, KafkaError, KafkaException
 from .config import KafkaConfig
-from asset_data.global_buffer_manager import global_buffer_manager
 
 class Take5KafkaConsumer:
     """
@@ -14,9 +13,10 @@ class Take5KafkaConsumer:
     - asset_trends: AssetTrendGraph messages
     """
     
-    def __init__(self, config: KafkaConfig = None):
+    def __init__(self, config: KafkaConfig = None, app=None):
         # Use provided config or create default
         self.config = config or KafkaConfig()
+        self.app = app
         self.consumer = None
         self.running = False
         self.topics = self.config.topics
@@ -45,9 +45,9 @@ class Take5KafkaConsumer:
                 symbol = data.get('symbol', 'UNKNOWN')
                 bar_time_frame = data.get('barData', {}).get('barTimeFrame', 'UNKNOWN')
                 
-                # Feed message to global buffer manager with topic info
+                # Feed message to buffer manager via app
                 if symbol != 'UNKNOWN' and bar_time_frame != 'UNKNOWN':
-                    global_buffer_manager.add_message('bar_trends', symbol, bar_time_frame, data)
+                    self.app.get_global_buffer_manager().add_message('bar_trends', symbol, bar_time_frame, data)
                 
                 self.logger.debug(f"📊 [BAR_TRENDS] {symbol}-{bar_time_frame}")
         except json.JSONDecodeError:
@@ -64,9 +64,9 @@ class Take5KafkaConsumer:
                 symbol = data.get('symbol', 'UNKNOWN')
                 bar_time_frame = data.get('barData', {}).get('barTimeFrame', 'UNKNOWN')
                 
-                # Feed message to global buffer manager with topic info
+                # Feed message to buffer manager via app
                 if symbol != 'UNKNOWN' and bar_time_frame != 'UNKNOWN':
-                    global_buffer_manager.add_message('historic_stats', symbol, bar_time_frame, data)
+                    self.app.get_global_buffer_manager().add_message('historic_stats', symbol, bar_time_frame, data)
                 
                 self.logger.debug(f"📈 [HISTORIC_STATS] {symbol}-{bar_time_frame}")
         except json.JSONDecodeError:
@@ -83,9 +83,9 @@ class Take5KafkaConsumer:
                 symbol = data.get('symbol', 'UNKNOWN')
                 bar_time_frame = data.get('barData', {}).get('barTimeFrame', 'UNKNOWN')
                 
-                # Feed message to global buffer manager with topic info
+                # Feed message to buffer manager via app
                 if symbol != 'UNKNOWN' and bar_time_frame != 'UNKNOWN':
-                    global_buffer_manager.add_message('asset_trends', symbol, bar_time_frame, data)
+                    self.app.get_global_buffer_manager().add_message('asset_trends', symbol, bar_time_frame, data)
                 
                 self.logger.debug(f"🔮 [ASSET_TRENDS] {symbol}-{bar_time_frame}")
         except json.JSONDecodeError:
@@ -152,6 +152,11 @@ class Take5KafkaConsumer:
             return
             
         self.running = False
+        
+        # Stop all AssetTrendProcessors via app
+        if self.app and hasattr(self.app, 'asset_trend_factory'):
+            self.app.asset_trend_factory.stop_all_processors()
+            
         if self.consumer:
             self.consumer.close()
             self.logger.info("🛑 Kafka consumer stopped")
@@ -168,9 +173,9 @@ class Take5KafkaConsumer:
 class KafkaConsumerThread(threading.Thread):
     """Thread wrapper for running Kafka consumer"""
     
-    def __init__(self, config: KafkaConfig = None):
+    def __init__(self, config: KafkaConfig = None, app=None):
         super().__init__(daemon=True, name="KafkaConsumerThread")
-        self.consumer = Take5KafkaConsumer(config)
+        self.consumer = Take5KafkaConsumer(config, app)
         self.logger = logging.getLogger(__name__)
     
     def run(self):
