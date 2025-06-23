@@ -228,7 +228,8 @@ class Take5ApiServer:
             Returns sliding windows for the specified asset across all timeframes and topics.
             """
             try:
-                trends_data = []
+                # Dictionary to deduplicate and combine data from multiple topics
+                combined_data = {}
                 
                 # Get all buffer statistics
                 all_stats = self.buffer_manager.get_all_buffer_stats()
@@ -241,15 +242,42 @@ class Take5ApiServer:
                         if asset_symbol.upper() == asset_upper:
                             for bar_time_frame, buffer_info in bar_time_frames.items():
                                 
-                                # Format the record
-                                record = AssetTrendRecord(
-                                    asset=asset_symbol,
-                                    barTimeFrame=bar_time_frame,
-                                    lastUpdateTime=buffer_info.latest_time,
-                                    numRecords=buffer_info.point_count
-                                )
+                                # Create unique key for asset+barTimeFrame combination
+                                key = (asset_symbol, bar_time_frame)
                                 
-                                trends_data.append(record)
+                                if key not in combined_data:
+                                    # First occurrence - store the record
+                                    combined_data[key] = {
+                                        'asset': asset_symbol,
+                                        'barTimeFrame': bar_time_frame,
+                                        'lastUpdateTime': buffer_info.latest_time,
+                                        'numRecords': buffer_info.point_count,
+                                        'topics': [topic]
+                                    }
+                                else:
+                                    # Duplicate found - combine the data
+                                    existing = combined_data[key]
+                                    existing['topics'].append(topic)
+                                    
+                                    # Use the most recent lastUpdateTime
+                                    if (buffer_info.latest_time and 
+                                        (not existing['lastUpdateTime'] or 
+                                         buffer_info.latest_time > existing['lastUpdateTime'])):
+                                        existing['lastUpdateTime'] = buffer_info.latest_time
+                                    
+                                    # Sum the record counts from all topics
+                                    existing['numRecords'] += buffer_info.point_count
+                
+                # Convert to list of AssetTrendRecord objects
+                trends_data = []
+                for data in combined_data.values():
+                    record = AssetTrendRecord(
+                        asset=data['asset'],
+                        barTimeFrame=data['barTimeFrame'],
+                        lastUpdateTime=data['lastUpdateTime'],
+                        numRecords=data['numRecords']
+                    )
+                    trends_data.append(record)
                 
                 # Sort by barTimeFrame for consistent ordering
                 trends_data.sort(key=lambda x: x.barTimeFrame)

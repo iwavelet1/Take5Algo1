@@ -192,6 +192,10 @@ class AssetBufferManager:
         )
         self.change_listeners: Set[Callable[[str, str, int], None]] = set()
         
+        # Event system for AssetDataChanged
+        self.asset_data_listeners: Dict[str, Dict[str, List[Callable]]] = defaultdict(lambda: defaultdict(list))
+        # Structure: topic -> asset -> [listener_functions]
+        
         # Message queue for batch processing
         self.message_queue: List[List[Any]] = []
         self.queue_lock = threading.Lock()
@@ -326,8 +330,9 @@ class AssetBufferManager:
         buffer = self.buffers[topic][asset][bar_time_frame]
         changed = buffer.add_point(complete_message)
         
-        # Notify listeners if buffer changed
+        # Fire AssetDataChanged event and notify listeners if buffer changed
         if changed:
+            self._fire_asset_data_changed(topic, asset, bar_time_frame, complete_message)
             self._notify_listeners(topic, asset, bar_time_frame)
         
         return changed
@@ -466,6 +471,43 @@ class AssetBufferManager:
     def get_all_topics(self) -> List[str]:
         """Get all topics"""
         return sorted(self.buffers.keys())
+    
+    def register_asset_data_listener(self, topic: str, asset: str, listener: Callable) -> Callable[[], None]:
+        """
+        Register a listener for AssetDataChanged events for specific topic/asset.
+        Returns unsubscribe function.
+        """
+        self.asset_data_listeners[topic][asset].append(listener)
+        
+        def unsubscribe():
+            if listener in self.asset_data_listeners[topic][asset]:
+                self.asset_data_listeners[topic][asset].remove(listener)
+        
+        return unsubscribe
+    
+    def _fire_asset_data_changed(self, topic: str, asset: str, bar_time_frame: int, message: Any):
+        """Fire AssetDataChanged event for topic/asset combination"""
+        from .events import AssetDataChanged
+        
+        # Get current buffer info
+        buffer_info = self.get_buffer_info(topic, asset, bar_time_frame)
+        
+        # Create event
+        event = AssetDataChanged(
+            topic=topic,
+            asset=asset,
+            bar_time_frame=bar_time_frame,
+            message=message,
+            buffer_info=buffer_info,
+            timestamp=datetime.now()
+        )
+        
+        # Notify listeners for this specific topic/asset
+        for listener in self.asset_data_listeners[topic][asset]:
+            try:
+                listener(event)
+            except Exception as e:
+                self.logger.error(f"Error in AssetDataChanged listener: {e}")
     
     def _notify_listeners(self, topic: str, asset: str, bar_time_frame: int):
         """Notify all change listeners"""
