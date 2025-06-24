@@ -3,3 +3,4 @@ python-json-logger==2.0.7
 colorlog==6.7.0
 fastapi==0.104.1
 uvicorn==0.24.0
+sortedcontainers==2.4.0

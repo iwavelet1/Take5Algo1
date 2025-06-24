@@ -9,7 +9,7 @@ import logging
 from typing import Dict, Set, List
 from asset_data import AssetBufferManager, AssetDataChanged
 from .asset_trend_processor import AssetTrendProcessor, SignalAlgorithm
-from .cross_calculator import CrossCalculator
+from .cross_algo import CrossAlgo
 
 
 class AssetTrendFactory:
@@ -40,11 +40,11 @@ class AssetTrendFactory:
         # Asset-specific algorithm map
         asset_algorithm_map = {
             # Wildcard "*" applies to all assets
-            "*": [CrossCalculator()],
+            "*": [CrossAlgo()],
             
             # Add specific assets and their algorithms here
-            "NVDA": [CrossCalculator()],
-            # Example: "SPY": [CrossCalculator(), SomeOtherAlgorithm()],
+            "NVDA": [CrossAlgo()],
+            # Example: "SPY": [CrossAlgo(), SomeOtherAlgorithm()],
             # Specific asset entries override the wildcard
         }
         
@@ -89,8 +89,8 @@ class AssetTrendFactory:
         # Get algorithms for this asset
         algorithms = self.get_algorithms_for_asset(asset)
         
-        # Create new processor with algorithm map
-        processor = AssetTrendProcessor(asset, self.buffer_manager, self.asset_algorithms)
+        # Create new processor with algorithm map and app reference
+        processor = AssetTrendProcessor(asset, self.buffer_manager, self.asset_algorithms, self.app)
         
         # Start the processor
         processor.start()

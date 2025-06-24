@@ -38,10 +38,11 @@ class AssetTrendProcessor:
     - Prints API-format data with current state
     """
     
-    def __init__(self, asset: str, buffer_manager: AssetBufferManager, asset_algorithms: dict):
+    def __init__(self, asset: str, buffer_manager: AssetBufferManager, asset_algorithms: dict, app=None):
         self.asset = asset
         self.buffer_manager = buffer_manager
         self.asset_algorithms = asset_algorithms
+        self.app = app  # Reference to Take5Algo1 app
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.unsubscribe_func: Optional[callable] = None
@@ -136,16 +137,26 @@ class AssetTrendProcessor:
         try:
             # Get all data for this topic/asset combination once
             topic_asset_data = self.buffer_manager.get_asset_from_topic(event.topic, event.asset)
+            # Format: Dict[int, TimeBasedSlidingWindow] where keys are barTimeFrame integers (e.g., 60, 300, 720)
+            # and values are TimeBasedSlidingWindow objects containing sliding window data for each timeframe.
+            # The barTimeFrame values are dynamic and come from incoming Kafka messages, not hardcoded.
             
                         # Get distinct algorithms for this asset (wildcard + asset-specific)
             algorithms = list({type(algo): algo for algo in self.asset_algorithms.get("*", []) + self.asset_algorithms.get(event.asset, [])}.values())
             
-            # Run all signal algorithms with the data
+            # Run all signal algorithms with the data and collect results as map
+            algorithm_results = {}
             for algo in algorithms:
                 try:
-                    algo.process(event, topic_asset_data)
+                    result = algo.process(event, topic_asset_data)
+                    algorithm_results[algo.__class__.__name__] = result
                 except Exception as e:
                     self.logger.error(f"Error in algorithm {algo.__class__.__name__} for {event.asset}: {e}")
+                    algorithm_results[algo.__class__.__name__] = None
+            
+            # Store results in Take5Algo1 app for API access
+            if self.app:
+                self.app.store_algorithm_results(self.asset, algorithm_results)
             
             # Print current state in API format using the event's buffer_info
             self._print_api_format(event.buffer_info, event.bar_time_frame)

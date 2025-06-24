@@ -98,6 +98,21 @@ docker-compose logs -f python_analytics
 - **Buffer Structure:** Topic → Asset → BarTimeFrame → TimeBasedSlidingWindow
 - **Message Processing:** Batch processing with thread-safe queues
 
+### Data Format in Signal Algorithms
+When algorithms receive data via `get_asset_from_topic()`, the format is:
+```python
+data: Dict[int, TimeBasedSlidingWindow] = {
+    60: TimeBasedSlidingWindow,      # 1-minute timeframe window
+    300: TimeBasedSlidingWindow,     # 5-minute timeframe window  
+    720: TimeBasedSlidingWindow,     # 12-minute timeframe window
+    1560: TimeBasedSlidingWindow,    # 26-minute timeframe window
+    # ... any other timeframes from incoming messages
+}
+```
+- **Keys:** `barTimeFrame` integers (dynamic, from message data)
+- **Values:** `TimeBasedSlidingWindow` objects with methods like `get_current_message()`, `get_messages()`
+- **Access Pattern:** `data[60].get_current_message()` gets latest message for 60-second timeframe
+
 ### Asset Trends
 - **Analysis Frequency:** Every 60 seconds
 - **Trend Detection:** Direction, strength, and confidence scoring
@@ -163,5 +178,7 @@ This runs the complete git workflow: stage, commit, and push to main branch.
 <!-- Updated: 2025-06-22 -->
 
 <!-- Updated: 2025-06-23 -->
+
+<!-- Updated: 2025-06-24 -->
 
 <!-- Updated: 2025-06-24 -->

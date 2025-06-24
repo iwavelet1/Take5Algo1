@@ -61,10 +61,11 @@ class ErrorResponse(BaseModel):
 class Take5ApiServer:
     """FastAPI server for Take5Algo1 analytics data"""
     
-    def __init__(self, host='0.0.0.0', port=5000):
+    def __init__(self, host='0.0.0.0', port=5000, take5_app=None):
         self.host = host
         self.port = port
         self.buffer_manager = global_buffer_manager
+        self.take5_app = take5_app  # Reference to Take5Algo1 app for algorithm results
         self.logger = logging.getLogger(__name__)
         self.server = None
         self.server_thread = None
@@ -291,6 +292,79 @@ class Take5ApiServer:
                 
             except Exception as e:
                 self.logger.error(f"Error in /asset_trends/{asset} endpoint: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Internal server error: {str(e)}"
+                )
+
+        @self.app.get(
+            "/algorithm-results",
+            summary="Get All Algorithm Results",
+            description="Get algorithm results for all assets",
+            tags=["Algorithms"]
+        )
+        async def get_all_algorithm_results():
+            """Get algorithm results for all assets"""
+            try:
+                if not self.take5_app:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Algorithm results not available - Take5Algo1 app not connected"
+                    )
+                
+                results = self.take5_app.get_algorithm_results()
+                
+                return {
+                    'status': 'success',
+                    'timestamp': int(datetime.now().timestamp() * 1000),
+                    'totalAssets': len(results),
+                    'data': results
+                }
+                
+            except HTTPException:
+                raise
+            except Exception as e:
+                self.logger.error(f"Error in /algorithm-results endpoint: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Internal server error: {str(e)}"
+                )
+
+        @self.app.get(
+            "/algorithm-results/{asset}",
+            summary="Get Algorithm Results by Asset",
+            description="Get algorithm results for a specific asset",
+            tags=["Algorithms"]
+        )
+        async def get_algorithm_results_by_asset(asset: str):
+            """Get algorithm results for a specific asset"""
+            try:
+                if not self.take5_app:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Algorithm results not available - Take5Algo1 app not connected"
+                    )
+                
+                asset_upper = asset.upper()
+                results = self.take5_app.get_algorithm_results(asset_upper)
+                
+                if not results:
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"No algorithm results found for asset {asset_upper}"
+                    )
+                
+                return {
+                    'status': 'success',
+                    'timestamp': int(datetime.now().timestamp() * 1000),
+                    'asset': asset_upper,
+                    'data': results
+                }
+                
+            except HTTPException:
+                raise
+            except Exception as e:
+                self.logger.error(f"Error in /algorithm-results/{asset} endpoint: {e}")
                 raise HTTPException(
                     status_code=500,
                     detail=f"Internal server error: {str(e)}"

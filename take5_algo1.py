@@ -1,4 +1,5 @@
 import logging
+import threading
 from typing import Optional
 from kafka.config import KafkaConfig
 from kafka.consumer import KafkaConsumerThread
@@ -12,6 +13,10 @@ class Take5Algo1:
     def __init__(self, config: Optional[KafkaConfig] = None):
         self.logger = logging.getLogger(__name__)
         self.config = config or KafkaConfig()
+        
+        # Algorithm results storage: {asset: {algo_name: result}}
+        self.algorithm_results = {}
+        self.results_lock = threading.Lock()
         
         # Initialize components
         self.global_buffer_manager = global_buffer_manager
@@ -51,3 +56,15 @@ class Take5Algo1:
     def get_asset_trend_factory(self):
         """Get the asset trend factory"""
         return self.asset_trend_factory 
+    
+    def store_algorithm_results(self, asset: str, results: dict):
+        """Store algorithm results for API access"""
+        with self.results_lock:
+            self.algorithm_results[asset] = results
+    
+    def get_algorithm_results(self, asset: str = None):
+        """Get algorithm results for API"""
+        with self.results_lock:
+            if asset:
+                return self.algorithm_results.get(asset, {})
+            return self.algorithm_results.copy()

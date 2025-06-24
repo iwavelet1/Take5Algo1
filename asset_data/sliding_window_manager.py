@@ -11,6 +11,7 @@ from typing import Dict, List, Any, Optional, Callable, Set
 from dataclasses import dataclass
 from collections import defaultdict
 from datetime import datetime
+from sortedcontainers import SortedDict
 
 
 @dataclass
@@ -154,8 +155,9 @@ class AssetBufferManager:
     def __init__(self, window_size_minutes: int = 120):
         self.window_size_minutes = window_size_minutes
         # Topic → Asset → BarTimeFrame → Buffer
-        self.buffers: Dict[str, Dict[str, Dict[int, TimeBasedSlidingWindow]]] = defaultdict(
-            lambda: defaultdict(dict)
+        # Using SortedDict for automatic key sorting on assets and timeframes
+        self.buffers: Dict[str, SortedDict[str, SortedDict[int, TimeBasedSlidingWindow]]] = defaultdict(
+            lambda: SortedDict(lambda: SortedDict())
         )
         self.change_listeners: Set[Callable[[str, str, int], None]] = set()
         
@@ -169,11 +171,11 @@ class AssetBufferManager:
     
     def add_message(self, topic: str, asset: str, bar_time_frame: int, complete_message: Any) -> bool:
         """Add a message to the appropriate buffer"""
-        # Get or create buffer
+        # Get or create buffer - SortedDict automatically maintains sorted order
         if topic not in self.buffers:
-            self.buffers[topic] = defaultdict(dict)
+            self.buffers[topic] = SortedDict()
         if asset not in self.buffers[topic]:
-            self.buffers[topic][asset] = {}
+            self.buffers[topic][asset] = SortedDict()
         if bar_time_frame not in self.buffers[topic][asset]:
             self.buffers[topic][asset][bar_time_frame] = TimeBasedSlidingWindow(
                 asset, bar_time_frame, self.window_size_minutes
@@ -191,29 +193,40 @@ class AssetBufferManager:
     
     def get_messages(self, topic: str, asset: str, bar_time_frame: int) -> List[Any]:
         """Get all messages for a specific combination"""
-        buffer = self.buffers.get(topic, {}).get(asset, {}).get(bar_time_frame)
+        topic_data = self.buffers.get(topic, SortedDict())
+        asset_data = topic_data.get(asset, SortedDict())
+        buffer = asset_data.get(bar_time_frame)
         return buffer.get_messages() if buffer else []
     
     def get_current_message(self, topic: str, asset: str, bar_time_frame: int) -> Optional[Any]:
         """Get the current (latest) message for a specific combination"""
-        buffer = self.buffers.get(topic, {}).get(asset, {}).get(bar_time_frame)
+        topic_data = self.buffers.get(topic, SortedDict())
+        asset_data = topic_data.get(asset, SortedDict())
+        buffer = asset_data.get(bar_time_frame)
         return buffer.get_current_message() if buffer else None
     
     def get_asset_from_topic(self, topic: str, asset: str) -> Dict[int, Any]:
         """Get all data for a topic/asset combination"""
-        return self.buffers.get(topic, {}).get(asset, {})
+        topic_data = self.buffers.get(topic, SortedDict())
+        return topic_data.get(asset, SortedDict())
     
     def get_all_assets(self, topic: str) -> List[str]:
         """Get all assets for a topic"""
-        return sorted(self.buffers.get(topic, {}).keys())
+        # SortedDict keys are already sorted, no need to call sorted()
+        return list(self.buffers.get(topic, SortedDict()).keys())
     
     def get_bar_time_frames(self, topic: str, asset: str) -> List[int]:
         """Get all bar time frames for a topic/asset combination"""
-        return sorted(self.buffers.get(topic, {}).get(asset, {}).keys())
+        # SortedDict keys are already sorted, no need to call sorted()
+        topic_data = self.buffers.get(topic, SortedDict())
+        asset_data = topic_data.get(asset, SortedDict())
+        return list(asset_data.keys())
     
     def get_buffer_info(self, topic: str, asset: str, bar_time_frame: int) -> Optional[BufferInfo]:
         """Get buffer information for a specific combination"""
-        buffer = self.buffers.get(topic, {}).get(asset, {}).get(bar_time_frame)
+        topic_data = self.buffers.get(topic, SortedDict())
+        asset_data = topic_data.get(asset, SortedDict())
+        buffer = asset_data.get(bar_time_frame)
         return buffer.get_window_info() if buffer else None
     
     def subscribe(self, listener: Callable[[str, str, int], None]) -> Callable[[], None]:
@@ -265,6 +278,7 @@ class AssetBufferManager:
     
     def get_all_topics(self) -> List[str]:
         """Get all topics"""
+        # Topics are stored in regular dict, but typically few topics so sorting is fast
         return sorted(self.buffers.keys())
     
     def register_asset_data_listener(self, topic: str, asset: str, listener: Callable) -> Callable[[], None]:
